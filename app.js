@@ -1,5 +1,5 @@
 require("dotenv").config();
-
+const { validateMovie, validateUser } = require("./validators.js");
 const express = require("express");
 
 const app = express();
@@ -12,6 +12,7 @@ const {
   verifyToken,
   verifyid,
 } = require("./auth.js");
+
 const userHandlers = require("./userHandlers");
 const {
   getUsers,
@@ -28,28 +29,34 @@ const welcome = (req, res) => {
   res.send("Welcome to my favourite movie list");
 };
 
-app.get("/", welcome);
-
 // the public routes
-app.get("/api/movies", movieHandlers.getMovies);
-app.get("/api/movies/:id", movieHandlers.getMovieById);
-app.get("/api/users", userHandlers.getUsers);
-app.get("/api/users/:id", userHandlers.getUserById);
-app.post("/api/users", hashPassword, userHandlers.postUser);
+app.get("/", welcome);
 app.post(
   "/api/login",
   userHandlers.getUserByEmailWithPasswordAndPassToNext,
   verifyPassword
 );
 
+app.post("/api/users", hashPassword, userHandlers.postUser);
+app.get("/api/movies", movieHandlers.getMovies);
+app.get("/api/movies/:id", movieHandlers.getMovieById);
+app.get("/api/users", userHandlers.getUsers);
+app.get("/api/users/:id", userHandlers.getUserById);
+
 // the routes to protect
 app.use(verifyToken);
 
-app.post("/api/movies", verifyToken, movieHandlers.postMovie);
-app.put("/api/movies/:id", movieHandlers.updateMovie);
+app.post("/api/movies", validateMovie, verifyToken, movieHandlers.postMovie);
+app.put("/api/movies/:id", validateMovie, movieHandlers.updateMovie);
 app.delete("/api/movies/:id", movieHandlers.deleteMovie);
 
-app.put("/api/users/:id", verifyid, userHandlers.updateUser, hashPassword);
+app.put(
+  "/api/users/:id",
+  verifyid,
+  validateUser,
+  userHandlers.updateUser,
+  hashPassword
+);
 app.delete("/api/users/:id", verifyid, userHandlers.deleteUser);
 
 const port = process.env.APP_PORT ?? 5000;
