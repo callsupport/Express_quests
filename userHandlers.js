@@ -3,39 +3,14 @@ const database = require("./database");
 const argon2 = require("argon2");
 
 const getUsers = (req, res) => {
-  const initialSql = "select * from users";
-  const where = [];
-
-  if (req.query.city != null) {
-    where.push({
-      column: "city",
-      value: req.query.city,
-      operator: "=",
-    });
-  }
-  if (req.query.language != null) {
-    where.push({
-      column: "language",
-      value: req.query.language,
-      operator: "=",
-    });
-  }
-
   database
-    .query(
-      where.reduce(
-        (sql, { column, operator }, index) =>
-          `${sql} ${index === 0 ? "where" : "and"} ${column} ${operator} ?`,
-        initialSql
-      ),
-      where.map(({ value }) => value)
-    )
+    .query("SELECT * FROM users")
     .then(([users]) => {
-      res.json(users);
+      res.status(200).json(users);
     })
     .catch((err) => {
       console.error(err);
-      res.status(500).send("Error retrieving data from database");
+      res.status(500).json({ message: "Erreur interne du serveur" });
     });
 };
 
@@ -60,9 +35,31 @@ const getUserById = (req, res) => {
     });
 };
 
-const postUser = async (req, res) => {
-  const { firstname, lastname, email, city, language, password } = req.body;
-  const hashedPassword = await argon2.hash("password");
+const getUserByEmailWithPasswordAndPassToNext = (req, res, next) => {
+  const { email } = req.body;
+
+  database
+    .query("SELECT * FROM users WHERE email = ?", [email])
+    .then(([users]) => {
+      console.log(users);
+      if (users[0] != null) {
+        req.user = users[0];
+
+        next();
+      } else {
+        res.sendStatus(401);
+      }
+    })
+    .catch((err) => {
+      console.error(err);
+      res.status(500).send("Error retrieving data from database");
+    });
+};
+
+const postUser = (req, res) => {
+  const { firstname, lastname, email, city, language, hashedPassword } =
+    req.body;
+  console.log(req.body);
 
   database
     .query(
@@ -78,14 +75,16 @@ const postUser = async (req, res) => {
     });
 };
 
-const updateUser = async (req, res) => {
+const updateUser = (req, res) => {
   const id = parseInt(req.params.id);
-  const { firstname, lastname, email, city, language, password } = req.body;
-  const hashedPassword = await argon2.hash(password);
+  const { firstname, lastname, email, city, language, hashedPassword } =
+    req.body;
+
+  console.log(req.body);
 
   database
     .query(
-      "update users set firstname = ?, lastname = ?, email = ?, city = ?, language = ?, hashedPassword = ? where id = ?",
+      "update users set firstname = ?, lastname = ?, email = ?, city = ?, language = ?, hashedPassword= ? where id = ?",
       [firstname, lastname, email, city, language, hashedPassword, id]
     )
     .then(([result]) => {
@@ -122,6 +121,7 @@ const deleteUser = (req, res) => {
 module.exports = {
   getUsers,
   getUserById,
+  getUserByEmailWithPasswordAndPassToNext,
   postUser,
   updateUser,
   deleteUser,
