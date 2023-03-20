@@ -3,14 +3,39 @@ const database = require("./database");
 const argon2 = require("argon2");
 
 const getUsers = (req, res) => {
+  const initialSql = "SELECT * FROM users";
+  const where = [];
+
+  if (req.query.city != null) {
+    where.push({
+      column: "city",
+      value: req.query.city,
+      operator: "=",
+    });
+  }
+  if (req.query.language != null) {
+    where.push({
+      column: "language",
+      value: req.query.language,
+      operator: "=",
+    });
+  }
+
   database
-    .query("SELECT * FROM users")
+    .query(
+      where.reduce(
+        (sql, { column, operator }, index) =>
+          `${sql} ${index === 0 ? "where" : "and"} ${column} ${operator} ?`,
+        initialSql
+      ),
+      where.map(({ value }) => value)
+    )
     .then(([users]) => {
-      res.status(200).json(users);
+      res.json(users);
     })
     .catch((err) => {
       console.error(err);
-      res.status(500).json({ message: "Erreur interne du serveur" });
+      res.status(500).send("Error retrieving data from database");
     });
 };
 
